@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CounselPlex Counseling Response Study</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    max-width: 720px; margin: 0 auto; padding: 24px;
+    line-height: 1.55; color: #222; background: #f7f7f9;
+  }
+  h1 { font-size: 24px; margin: 0 0 8px; }
+  h2 { font-size: 20px; margin: 16px 0 8px; }
+  .card {
+    background: white; border-radius: 12px; padding: 24px; margin-bottom: 16px;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.05);
+  }
+  .progress {
+    height: 8px; background: #e5e7eb; border-radius: 4px; overflow: hidden;
+    margin: 8px 0 16px;
+  }
+  .progress-bar { height: 100%; background: #4f46e5; transition: width 0.3s; }
+  .audio-block {
+    background: #f9fafb; border-radius: 8px; padding: 16px; margin: 12px 0;
+    border: 1px solid #e5e7eb;
+  }
+  .audio-block.selected { border-color: #4f46e5; background: #eef2ff; }
+  .audio-block label { font-weight: 600; font-size: 16px; display: block; margin-bottom: 8px; }
+  audio { width: 100%; }
+  .choice {
+    display: flex; gap: 8px; flex-wrap: wrap; margin: 16px 0;
+  }
+  .choice label {
+    flex: 1; min-width: 120px; padding: 12px; border: 2px solid #e5e7eb;
+    border-radius: 8px; cursor: pointer; text-align: center; user-select: none;
+    transition: all 0.15s;
+  }
+  .choice input { display: none; }
+  .choice label:has(input:checked) {
+    border-color: #4f46e5; background: #eef2ff; color: #4f46e5; font-weight: 600;
+  }
+  textarea, input[type=text], input[type=email] {
+    width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px;
+    font-family: inherit; font-size: 14px;
+  }
+  textarea { min-height: 60px; resize: vertical; }
+  button {
+    background: #4f46e5; color: white; border: 0; padding: 12px 24px;
+    border-radius: 8px; font-size: 16px; cursor: pointer; font-weight: 600;
+  }
+  button:hover { background: #4338ca; }
+  button:disabled { background: #d1d5db; cursor: not-allowed; }
+  .nav { display: flex; justify-content: space-between; margin-top: 24px; gap: 8px; }
+  .secondary { background: white; color: #4f46e5; border: 1px solid #4f46e5; }
+  .secondary:hover { background: #eef2ff; }
+  .note { color: #6b7280; font-size: 14px; margin: 8px 0; }
+  pre {
+    background: #1f2937; color: #d1fae5; padding: 16px; border-radius: 8px;
+    overflow-x: auto; font-size: 12px; max-height: 300px;
+  }
+  ol li { margin: 6px 0; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<script>
+const SAMPLES = [
+  'S01_escot_test_1326_t5',
+  'S02_esconv_716_t20',
+  'S03_escot_test_318_t17',
+  'S04_esconv_302_t18',
+  'S05_esconv_71_t31',
+  'S06_escot_test_1596_t5',
+  'S07_escot_test_510_t6',
+  'S08_escot_test_1193_t13',
+  'S09_esconv_766_t9',
+  'S10_escot_test_1615_t13',
+  'S11_esconv_71_t29',
+  'S12_esconv_483_t23',
+  'S13_escot_test_1298_t5',
+  'S14_escot_test_1554_t3',
+  'S15_escot_test_301_t4',
+  'S16_escot_test_1457_t11',
+  'S17_escot_test_1257_t10',
+  'S18_escot_test_1406_t7',
+  'S19_escot_test_602_t3',
+  'S20_escot_test_607_t6',
+];
+
+let state = {
+  page: 'intro',   // intro | consent | sample | done
+  idx: 0,
+  participant: { name: '' },
+  responses: {},   // sample_id -> { choice, reason, ts }
+  startedAt: null,
+};
+
+const app = document.getElementById('app');
+
+function render() {
+  if (state.page === 'intro') return renderIntro();
+  if (state.page === 'consent') return renderConsent();
+  if (state.page === 'sample') return renderSample();
+  if (state.page === 'done') return renderDone();
+}
+
+function goToConsent() {
+  state.page = 'consent';
+  render();
+  window.scrollTo(0,0);
+}
+
+function renderIntro() {
+  app.innerHTML = `
+    <div class="card">
+      <h1>Counseling Response Quality Study</h1>
+      <p>Thank you for participating in this study on AI-generated counseling responses.</p>
+      <h2>What you'll do</h2>
+      <ol>
+        <li>You will hear <strong>${SAMPLES.length} conversation snippets</strong> (~1–6 min each).</li>
+        <li>Each snippet contains a conversation between a <strong>seeker</strong> (the person seeking support, often a male voice) and a <strong>counselor</strong> (the female voice).</li>
+        <li>Each snippet ends with two candidate <strong>counselor (female voice) responses</strong> labeled A and B.</li>
+        <li>Your task: judge which counselor response is <strong>better overall</strong> — more empathic, more helpful, more responsive, or more like a real counselor would say.</li>
+        <li>Focus on <strong>what the counselor (female voice) is saying</strong>: content, timing, how well she responds to the seeker. <em>Both A and B use the same voice</em>, so voice quality is not the focus.</li>
+        <li>Provide a brief reason for your choice (required for each sample).</li>
+      </ol>
+      <p class="note">Estimated time: <strong>about 80 minutes</strong>. Your responses are anonymous and used only for academic research.</p>
+      <p class="note">On the next page you will review the consent information and provide your participant identifier before starting.</p>
+      <div class="nav">
+        <span></span>
+        <button onclick="goToConsent()">Continue →</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderConsent() {
+  app.innerHTML = `
+    <div class="card">
+      <h1>Informed Consent</h1>
+      <p class="note">Please read the information below carefully before agreeing to participate.</p>
+
+      <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:14px 16px;font-size:14px;line-height:1.6">
+        <p><strong>Purpose.</strong> You are invited to take part in an academic research study evaluating the quality of counseling responses produced by an AI dialogue model. The goal is to compare candidate responses to determine which feels more empathic and helpful to listeners.</p>
+        <p><strong>Procedures.</strong> You will listen to ${SAMPLES.length} audio snippets and, for each, choose between two candidate responses (A or B, or "about the same") and write a brief reason. The session takes approximately 80 minutes.</p>
+        <p><strong>Voluntary participation.</strong> Your participation is entirely voluntary. You may skip any question and withdraw at any time without penalty by simply closing the browser; partial responses will not be transmitted.</p>
+        <p><strong>Risks and benefits.</strong> No more than minimal risk is anticipated. Some snippets discuss emotionally sensitive topics (e.g., stress, relationships, loss). There are no direct benefits to you, but your input will contribute to research on supportive dialogue systems.</p>
+        <p><strong>Confidentiality.</strong> Your responses are anonymous. Only the identifier you provide below and your answers are recorded; no audio, video, or other personal data is collected. Results will be reported only in aggregated form and may appear in academic publications.</p>
+        <p><strong>Contact.</strong> If you have questions about this research, please contact the research team. Questions about your rights as a research participant may be directed to the Institutional Review Board (IRB) overseeing this study.</p>
+        <p><strong>Consent in lieu of signature.</strong> Because this study is conducted entirely online, a physical (handwritten) signature cannot be collected. By checking the box below and clicking "Start study", you confirm that you have read and understood the information above, that you are at least 18 years of age, and that you agree to participate. This action serves as your written informed consent.</p>
+      </div>
+
+      <p style="margin-top:16px">
+        <label style="display:flex;align-items:flex-start;gap:8px;cursor:pointer;user-select:none">
+          <input type="checkbox" id="consent" onchange="document.getElementById('startBtn').disabled = !this.checked" style="margin-top:4px">
+          <span><strong>I have read and understood the information above, I am at least 18 years old, and I agree to participate.</strong></span>
+        </label>
+      </p>
+
+      <h2>Participant info</h2>
+      <p>
+        <label>Prolific ID <span style="color:#dc2626">*required</span><br>
+          <span style="color:#dc2626;font-weight:600">⚠ Do NOT enter your real name. Enter your Prolific ID only.</span><br>
+          <input type="text" id="pname" placeholder="Prolific ID" required>
+        </label>
+      </p>
+      <div class="nav">
+        <button class="secondary" onclick="state.page='intro'; render(); window.scrollTo(0,0)">← Back</button>
+        <button id="startBtn" onclick="startStudy()" disabled>Start study →</button>
+      </div>
+    </div>
+  `;
+}
+
+function startStudy() {
+  const consent = document.getElementById('consent');
+  if (!consent || !consent.checked) {
+    alert('Please review the Informed Consent section and check the box to confirm before starting.');
+    consent && consent.focus();
+    return;
+  }
+  const name = document.getElementById('pname').value.trim();
+  if (!name) {
+    alert('Please enter your name or identifier (e.g., your Prolific ID) before starting.');
+    document.getElementById('pname').focus();
+    return;
+  }
+  state.participant.name = name;
+  state.consentedAt = new Date().toISOString();
+  state.startedAt = new Date().toISOString();
+  state.page = 'sample';
+  state.idx = 0;
+  render();
+  window.scrollTo(0,0);
+}
+
+function renderSample() {
+  const sid = SAMPLES[state.idx];
+  const r = state.responses[sid] || {};
+  const pct = (state.idx / SAMPLES.length) * 100;
+  app.innerHTML = `
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h1>Sample ${state.idx + 1} of ${SAMPLES.length}</h1>
+        <span class="note">${sid}</span>
+      </div>
+      <div class="progress"><div class="progress-bar" style="width:${pct}%"></div></div>
+      <p class="note">Listen to both A and B (in any order, as many times as you like), then pick which is better.</p>
+
+      <div class="audio-block">
+        <label>Response A</label>
+        <audio controls preload="metadata" src="audio_ab/${sid}/A.wav"></audio>
+      </div>
+      <div class="audio-block">
+        <label>Response B</label>
+        <audio controls preload="metadata" src="audio_ab/${sid}/B.wav"></audio>
+      </div>
+
+      <h2>Which counselor (female voice) response is better overall?</h2>
+      <div class="choice">
+        <label><input type="radio" name="choice" value="A" ${r.choice==='A'?'checked':''}>A is better</label>
+        <label><input type="radio" name="choice" value="B" ${r.choice==='B'?'checked':''}>B is better</label>
+        <label><input type="radio" name="choice" value="same" ${r.choice==='same'?'checked':''}>About the same</label>
+      </div>
+
+      <p><label>Brief reason <span style="color:#dc2626">*required</span>:<br>
+        <textarea id="reason" placeholder="e.g., A was more empathic / B was on-topic">${r.reason||''}</textarea>
+      </label></p>
+
+      <div class="nav">
+        <button class="secondary" onclick="back()" ${state.idx===0?'disabled':''}>← Back</button>
+        <button onclick="next()">${state.idx === SAMPLES.length-1 ? 'Submit responses →' : 'Next →'}</button>
+      </div>
+    </div>
+  `;
+}
+
+function saveCurrent() {
+  const choice = document.querySelector('input[name=choice]:checked');
+  const reason = document.getElementById('reason').value;
+  const sid = SAMPLES[state.idx];
+  if (!choice) return false;
+  if (!reason.trim()) return false;
+  state.responses[sid] = { choice: choice.value, reason: reason.trim(), ts: Date.now() };
+  return true;
+}
+
+function next() {
+  const choice = document.querySelector('input[name=choice]:checked');
+  if (!choice) {
+    alert('Please choose A, B, or "About the same" before continuing.');
+    return;
+  }
+  if (!document.getElementById('reason').value.trim()) {
+    alert('Please write a brief reason for your choice before continuing.');
+    document.getElementById('reason').focus();
+    return;
+  }
+  saveCurrent();
+  if (state.idx === SAMPLES.length - 1) {
+    state.page = 'done';
+  } else {
+    state.idx += 1;
+  }
+  render();
+  window.scrollTo(0,0);
+}
+
+function back() {
+  // save current if possible (silently)
+  const choice = document.querySelector('input[name=choice]:checked');
+  if (choice) saveCurrent();
+  if (state.idx > 0) state.idx -= 1;
+  render();
+  window.scrollTo(0,0);
+}
+
+// Web3Forms access key — emails delivered to yeonju7.kim@gmail.com
+const WEB3FORMS_KEY = "21ee32f6-3bd9-47da-9578-cf127ed8c956";
+
+async function autoSubmit(out) {
+  if (WEB3FORMS_KEY === "REPLACE_WITH_YOUR_KEY") return null;
+  try {
+    const r = await fetch("https://api.web3forms.com/submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Accept": "application/json" },
+      body: JSON.stringify({
+        access_key: WEB3FORMS_KEY,
+        subject: `CounselPlex study — ${out.participant.name || 'anonymous'}`,
+        from_name: out.participant.name || "Anonymous participant",
+        email: "anonymous@example.com",
+        message: JSON.stringify(out, null, 2),
+      })
+    });
+    return r.ok;
+  } catch (e) { return false; }
+}
+
+async function renderDone() {
+  const out = {
+    participant: state.participant,
+    started_at: state.startedAt,
+    completed_at: new Date().toISOString(),
+    responses: state.responses,
+  };
+  const json = JSON.stringify(out, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const fname = `userstudy_${(state.participant.name||'anon').replace(/[^a-zA-Z0-9]/g,'_')}_${Date.now()}.json`;
+  const mailBody = encodeURIComponent('Please find my user study responses pasted below:\n\n' + json);
+
+  // first render loading state, then try auto-submit, then update banner
+  app.innerHTML = `
+    <div class="card">
+      <h1>✓ Thank you!</h1>
+      <p>You completed all ${SAMPLES.length} samples.</p>
+      <div id="submitStatus" class="audio-block" style="background:#fef3c7;border-color:#fbbf24">
+        <strong>⏳ Submitting your responses to the researcher…</strong>
+      </div>
+      <h2>Backup: manual submission</h2>
+      <p>If the automatic submission above fails, please use one of these options:</p>
+      <p><a href="${url}" download="${fname}"><button>📥 Download responses (.json)</button></a></p>
+      <p><button onclick="copyJson()">📋 Copy responses to clipboard</button></p>
+      <p><a href="mailto:?subject=CounselPlex%20User%20Study%20Responses&body=${mailBody}"><button class="secondary">✉️ Open email with responses</button></a></p>
+      <pre id="jsonout" style="max-height:200px">${json.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c]))}</pre>
+    </div>
+  `;
+  const ok = await autoSubmit(out);
+  const banner = document.getElementById('submitStatus');
+  if (ok === true) {
+    banner.style.background = '#d1fae5';
+    banner.style.borderColor = '#10b981';
+    banner.innerHTML = '<strong>✓ Responses submitted successfully — thank you!</strong><br>The researcher has been notified by email. You may now close this page.';
+  } else if (ok === false) {
+    banner.style.background = '#fee2e2';
+    banner.style.borderColor = '#ef4444';
+    banner.innerHTML = '<strong>⚠ Automatic submission failed.</strong><br>Please use one of the backup options below to send your responses.';
+  } else {
+    // null — auto-submit disabled
+    banner.style.background = '#fef3c7';
+    banner.style.borderColor = '#fbbf24';
+    banner.innerHTML = '<strong>📩 Please send your responses</strong> using one of the options below.';
+  }
+}
+
+function copyJson() {
+  const text = document.getElementById('jsonout').innerText;
+  navigator.clipboard.writeText(text).then(()=>alert('Copied!'));
+}
+
+render();
+</script>
+</body>
+</html>
